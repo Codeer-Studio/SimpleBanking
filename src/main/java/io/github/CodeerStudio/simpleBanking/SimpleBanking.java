@@ -1,18 +1,23 @@
 package io.github.CodeerStudio.simpleBanking;
 
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import io.github.CodeerStudio.simpleBanking.handlers.VaultAPIHandler;
 
 public final class SimpleBanking extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // Plugin startup logic
-        Bukkit.getLogger().info("Hello there!");
+        if (!VaultAPIHandler.setUpEconomy(this)) {
+            getLogger().severe("Disabling plugin due to missing Vault economy!");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        getLogger().info("BankPlugin has been enabled!");
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        getLogger().info("BankPlugin has been disabled!");
     }
 }
