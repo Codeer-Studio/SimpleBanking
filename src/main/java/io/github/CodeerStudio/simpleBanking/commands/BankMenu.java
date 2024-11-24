@@ -23,6 +23,10 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * This class handles the bank menu GUI and player interactions with it.
+ * It allows players to deposit and withdraw money into/from their bank account.
+ */
 public class BankMenu implements Listener, CommandExecutor {
 
     private final String inventoryName = ChatColor.translateAlternateColorCodes('&', "&6Bank");
@@ -33,8 +37,27 @@ public class BankMenu implements Listener, CommandExecutor {
     private static final int WITHDRAW_SLOT = 15;
     private final SimpleBanking plugin;
 
+    /**
+     * Creates a new instance of BankMenu, registers the event listener, and links the plugin.
+     *
+     * @param plugin The SimpleBanking plugin instance.
+     */
+    public BankMenu(SimpleBanking plugin) {
+        this.plugin = plugin; // Assign the plugin instance to the field
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+    }
+
+    /**
+     * Handles the execution of the "/bank" command. Opens the bank inventory for the player.
+     *
+     * @param sender The entity that executed the command.
+     * @param command The command that was executed.
+     * @param label The alias used to execute the command.
+     * @param args Arguments passed with the command.
+     * @return true if the command was handled successfully, false otherwise.
+     */
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String [] args) {
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
             sender.sendMessage("Only players can run this command.");
             return true;
@@ -42,14 +65,21 @@ public class BankMenu implements Listener, CommandExecutor {
 
         Player player = (Player) sender;
 
-        Inventory inventory = Bukkit.createInventory(player, 9 * 3, inventoryName);
+        // Create and populate the inventory
+        Inventory inventory = Bukkit.createInventory(player, INVENTORY_SIZE, inventoryName);
         populateInventory(inventory);
 
+        // Open the inventory for the player
         player.openInventory(inventory);
 
         return true;
     }
 
+    /**
+     * Handles clicks in the bank inventory. Performs actions based on the clicked slot.
+     *
+     * @param event The inventory click event triggered by a player.
+     */
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!event.getView().getTitle().equals(inventoryName)) {
@@ -68,12 +98,11 @@ public class BankMenu implements Listener, CommandExecutor {
         }
     }
 
-    public BankMenu(SimpleBanking plugin) {
-        this.plugin = plugin; // Assign the plugin instance to the field
-        Bukkit.getPluginManager().registerEvents(this, plugin);
-    }
-
-
+    /**
+     * Populates the bank inventory with items representing actions (deposit, withdraw, information).
+     *
+     * @param inventory The inventory to populate.
+     */
     private void populateInventory(Inventory inventory) {
         inventory.setItem(11, getItem(
                 new ItemStack(Material.CHEST),
@@ -81,14 +110,14 @@ public class BankMenu implements Listener, CommandExecutor {
                 "&7Deposit your money."
         ));
 
-        // Add a sign to slot 13
+        // Add a sign to slot 13 for bank information
         inventory.setItem(13, getItem(
                 new ItemStack(Material.OAK_SIGN),
                 "&cBank Information",
                 "&7Check the latest bank news."
         ));
 
-        // Add a dispenser to slot 15
+        // Add a dispenser to slot 15 for withdrawal
         inventory.setItem(15, getItem(
                 new ItemStack(Material.DISPENSER),
                 "&6Bank Vault",
@@ -96,7 +125,15 @@ public class BankMenu implements Listener, CommandExecutor {
         ));
     }
 
-    private ItemStack getItem(ItemStack item, String name, String ... lore) {
+    /**
+     * Creates an ItemStack with the specified name and lore, and sets its metadata.
+     *
+     * @param item The item to modify.
+     * @param name The name to assign to the item.
+     * @param lore Optional lore to assign to the item.
+     * @return The modified ItemStack.
+     */
+    private ItemStack getItem(ItemStack item, String name, String... lore) {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
@@ -116,6 +153,12 @@ public class BankMenu implements Listener, CommandExecutor {
         return item;
     }
 
+    /**
+     * Handles depositing money into the player's bank account.
+     * It withdraws money from the player and updates their balance in the database.
+     *
+     * @param player The player performing the deposit.
+     */
     private void handleDeposit(Player player) {
         double amountToDeposit = 100.0;
         Economy economy = VaultAPIHandler.getEconomy();
@@ -143,6 +186,12 @@ public class BankMenu implements Listener, CommandExecutor {
         player.sendMessage(ChatColor.GREEN + "Successfully deposited " + amountToDeposit + " into your bank!");
     }
 
+    /**
+     * Handles withdrawing money from the player's bank account.
+     * It checks the player's balance in the database and updates it when the withdrawal is successful.
+     *
+     * @param player The player performing the withdrawal.
+     */
     private void handleWithdraw(Player player) {
         double amountToWithdraw = 100.0; // Example amount
         try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
@@ -176,6 +225,11 @@ public class BankMenu implements Listener, CommandExecutor {
         player.sendMessage(ChatColor.GREEN + "Successfully withdrew " + amountToWithdraw + " from your bank!");
     }
 
+    /**
+     * Displays the player's bank balance by querying the database.
+     *
+     * @param player The player requesting their balance.
+     */
     private void showBankInformation(Player player) {
         try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
                 "SELECT balance FROM player_balances WHERE uuid = ?")) {
