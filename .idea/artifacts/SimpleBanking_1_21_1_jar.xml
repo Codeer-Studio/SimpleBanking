@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="SimpleBanking-1.21.1:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/SimpleBanking_1_21_1_jar</output-path>
+    <root id="archive" name="SimpleBanking-1.21.1.jar">
+      <element id="module-output" name="io.github.CodeerStudio.Simple_Banking.main" />
+      <element id="file-copy" path="$PROJECT_DIR$/src/main/resources/plugin.yml" />
+    </root>
+  </artifact>
+</component>
