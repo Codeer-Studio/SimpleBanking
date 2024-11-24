@@ -1,11 +1,10 @@
 package io.github.CodeerStudio.simpleBanking.commands;
 
 import io.github.CodeerStudio.simpleBanking.SimpleBanking;
-import io.github.CodeerStudio.simpleBanking.handlers.VaultAPIHandler;
-import net.milkbowl.vault.economy.Economy;
+import io.github.CodeerStudio.simpleBanking.gui.BankMenuGUI;
+import io.github.CodeerStudio.simpleBanking.handlers.BankManagerHandler;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -13,28 +12,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * This class handles the bank menu GUI and player interactions with it.
- * It allows players to deposit and withdraw money into/from their bank account.
  */
 public class BankMenu implements Listener, CommandExecutor {
 
-    private final String inventoryName = ChatColor.translateAlternateColorCodes('&', "&6Bank");
-    private static final int INVENTORY_ROWS = 3;
-    private static final int INVENTORY_SIZE = INVENTORY_ROWS * 9;
-    private static final int DEPOSIT_SLOT = 11;
-    private static final int INFORMATION_SLOT = 13;
-    private static final int WITHDRAW_SLOT = 15;
     private final SimpleBanking plugin;
 
     /**
@@ -58,16 +43,14 @@ public class BankMenu implements Listener, CommandExecutor {
      */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can run this command.");
             return true;
         }
 
-        Player player = (Player) sender;
-
         // Create and populate the inventory
-        Inventory inventory = Bukkit.createInventory(player, INVENTORY_SIZE, inventoryName);
-        populateInventory(inventory);
+        Inventory inventory = BankMenuGUI.createBankMenu(player);
+        player.openInventory(inventory);
 
         // Open the inventory for the player
         player.openInventory(inventory);
@@ -82,7 +65,8 @@ public class BankMenu implements Listener, CommandExecutor {
      */
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!event.getView().getTitle().equals(inventoryName)) {
+        // Ensure the inventory is the bank menu
+        if (!event.getView().getTitle().equals(BankMenuGUI.getInventoryName())) {
             return;
         }
 
@@ -90,162 +74,86 @@ public class BankMenu implements Listener, CommandExecutor {
         int slot = event.getSlot();
         event.setCancelled(true);
 
+        // Determine action based on the clicked slot
         switch (slot) {
-            case DEPOSIT_SLOT -> handleDeposit(player);
-            case WITHDRAW_SLOT -> handleWithdraw(player);
-            case INFORMATION_SLOT -> showBankInformation(player);
-            default -> player.sendMessage(ChatColor.YELLOW + "This slot does nothing.");
-        }
-    }
-
-    /**
-     * Populates the bank inventory with items representing actions (deposit, withdraw, information).
-     *
-     * @param inventory The inventory to populate.
-     */
-    private void populateInventory(Inventory inventory) {
-        inventory.setItem(11, getItem(
-                new ItemStack(Material.CHEST),
-                "&6Bank Vault",
-                "&7Deposit your money."
-        ));
-
-        // Add a sign to slot 13 for bank information
-        inventory.setItem(13, getItem(
-                new ItemStack(Material.OAK_SIGN),
-                "&cBank Information",
-                "&7Check the latest bank news."
-        ));
-
-        // Add a dispenser to slot 15 for withdrawal
-        inventory.setItem(15, getItem(
-                new ItemStack(Material.DISPENSER),
-                "&6Bank Vault",
-                "&7Withdraw your money."
-        ));
-    }
-
-    /**
-     * Creates an ItemStack with the specified name and lore, and sets its metadata.
-     *
-     * @param item The item to modify.
-     * @param name The name to assign to the item.
-     * @param lore Optional lore to assign to the item.
-     * @return The modified ItemStack.
-     */
-    private ItemStack getItem(ItemStack item, String name, String... lore) {
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return item;
-
-        // Set the display name
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', name));
-
-        // Set the lore if provided
-        if (lore.length > 0) {
-            List<String> lores = new ArrayList<>();
-            for (String s : lore) {
-                lores.add(ChatColor.translateAlternateColorCodes('&', s));
+            case BankMenuGUI.DEPOSIT_SLOT -> {
+                player.closeInventory(); // Optional: close inventory if necessary
+                player.sendMessage(ChatColor.GREEN + "Enter the amount to deposit in the chat.");
+                promptForAmount(player, "deposit");
             }
-            meta.setLore(lores);
+            case BankMenuGUI.WITHDRAW_SLOT -> {
+                player.closeInventory();
+                player.sendMessage(ChatColor.GREEN + "Enter the amount to withdraw in the chat.");
+                promptForAmount(player, "withdraw");
+            }
+            case BankMenuGUI.INFORMATION_SLOT -> {
+                player.sendMessage(ChatColor.YELLOW + "Fetching your bank information...");
+                // Show the player their balance or other details
+                BankManagerHandler bankManagerHandler = new BankManagerHandler(plugin);
+                bankManagerHandler.showBankInformation(player);
+            }
+            default -> player.sendMessage(ChatColor.RED + "This slot does not perform any action.");
         }
-
-        item.setItemMeta(meta);
-        return item;
     }
 
     /**
-     * Handles depositing money into the player's bank account.
-     * It withdraws money from the player and updates their balance in the database.
+     * Prompts the player for an amount and listens for their input via chat.
      *
-     * @param player The player performing the deposit.
+     * @param player The player to prompt.
+     * @param action The action to perform ("deposit" or "withdraw").
      */
-    private void handleDeposit(Player player) {
-        double amountToDeposit = 100.0;
-        Economy economy = VaultAPIHandler.getEconomy();
+    private void promptForAmount(Player player, String action) {
+        plugin.getServer().getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onPlayerChat(AsyncPlayerChatEvent chatEvent) {
+                if (!chatEvent.getPlayer().equals(player)) return;
 
-        if (economy.getBalance(player) < amountToDeposit) {
-            player.sendMessage(ChatColor.RED + "You don't have enough money to deposit!");
-            return;
-        }
+                chatEvent.setCancelled(true);
+                String input = chatEvent.getMessage();
+                double amount;
 
-        economy.withdrawPlayer(player, amountToDeposit);
+                // Validate the input as a proper number
+                try {
+                    amount = Double.parseDouble(input);
 
-        try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
-                "INSERT INTO player_balances (uuid, balance) VALUES (?, ?) " +
-                        "ON CONFLICT(uuid) DO UPDATE SET balance = balance + ?")) {
-            stmt.setString(1, player.getUniqueId().toString());
-            stmt.setDouble(2, amountToDeposit);
-            stmt.setDouble(3, amountToDeposit);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            player.sendMessage(ChatColor.RED + "An error occurred while depositing your money.");
-            e.printStackTrace();
-            return;
-        }
+                    // Check if the number is positive
+                    if (amount <= 0) {
+                        player.sendMessage(ChatColor.RED + "The amount must be greater than zero. Try again.");
+                        return;
+                    }
 
-        player.sendMessage(ChatColor.GREEN + "Successfully deposited " + amountToDeposit + " into your bank!");
-    }
-
-    /**
-     * Handles withdrawing money from the player's bank account.
-     * It checks the player's balance in the database and updates it when the withdrawal is successful.
-     *
-     * @param player The player performing the withdrawal.
-     */
-    private void handleWithdraw(Player player) {
-        double amountToWithdraw = 100.0; // Example amount
-        try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
-                "SELECT balance FROM player_balances WHERE uuid = ?")) {
-            stmt.setString(1, player.getUniqueId().toString());
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (!rs.next() || rs.getDouble("balance") < amountToWithdraw) {
-                    player.sendMessage(ChatColor.RED + "You don't have enough money in the bank!");
+                    // Check for up to two decimal places
+                    if (!hasTwoDecimalPlacesOrLess(amount)) {
+                        player.sendMessage(ChatColor.RED + "The amount can only have up to two decimal places. Try again.");
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Invalid number. Please enter a valid amount.");
                     return;
                 }
+
+                // Perform the action
+                BankManagerHandler bankManagerHandler = new BankManagerHandler(plugin);
+                if (action.equals("deposit")) {
+                    bankManagerHandler.depositMoney(player, amount);
+                } else if (action.equals("withdraw")) {
+                    bankManagerHandler.handleWithdraw(player, amount);
+                }
+
+                // Unregister the listener after handling the input
+                AsyncPlayerChatEvent.getHandlerList().unregister(this);
             }
-        } catch (SQLException e) {
-            player.sendMessage(ChatColor.RED + "An error occurred while withdrawing your money.");
-            e.printStackTrace();
-            return;
-        }
-
-        try (PreparedStatement updateStmt = plugin.getDatabaseConnection().prepareStatement(
-                "UPDATE player_balances SET balance = balance - ? WHERE uuid = ?")) {
-            updateStmt.setDouble(1, amountToWithdraw);
-            updateStmt.setString(2, player.getUniqueId().toString());
-            updateStmt.executeUpdate();
-        } catch (SQLException e) {
-            player.sendMessage(ChatColor.RED + "An error occurred while withdrawing your money.");
-            e.printStackTrace();
-            return;
-        }
-
-        VaultAPIHandler.getEconomy().depositPlayer(player, amountToWithdraw);
-        player.sendMessage(ChatColor.GREEN + "Successfully withdrew " + amountToWithdraw + " from your bank!");
+        }, plugin);
     }
 
     /**
-     * Displays the player's bank balance by querying the database.
+     * Validates if a number has at most two decimal places.
      *
-     * @param player The player requesting their balance.
+     * @param value The number to validate.
+     * @return True if the number has up to two decimal places, false otherwise.
      */
-    private void showBankInformation(Player player) {
-        try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
-                "SELECT balance FROM player_balances WHERE uuid = ?")) {
-            stmt.setString(1, player.getUniqueId().toString());
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    double balance = rs.getDouble("balance");
-                    player.sendMessage(ChatColor.GOLD + "Your bank balance is: " + balance);
-                } else {
-                    player.sendMessage(ChatColor.RED + "You don't have a bank account yet.");
-                }
-            }
-        } catch (SQLException e) {
-            player.sendMessage(ChatColor.RED + "An error occurred while fetching your balance.");
-            e.printStackTrace();
-        }
+    private boolean hasTwoDecimalPlacesOrLess(double value) {
+        String[] parts = String.valueOf(value).split("\\.");
+        return parts.length <= 1 || parts[1].length() <= 2;
     }
 }
