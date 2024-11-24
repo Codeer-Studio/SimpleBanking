@@ -10,28 +10,44 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+/**
+ * Main class for the SimpleBanking plugin. This class handles the plugin's lifecycle,
+ * including initialization of Vault economy and SQLite database setup.
+ */
 public final class SimpleBanking extends JavaPlugin {
 
+    // The database connection used to interact with the SQLite database.
     private Connection connection;
 
+    /**
+     * Called when the plugin is enabled. This method sets up the economy (via Vault) and the database,
+     * and registers the command executor for the "bank" command.
+     */
     @Override
     public void onEnable() {
+        // Set up Vault economy provider
         if (!VaultAPIHandler.setUpEconomy(this)) {
             getLogger().severe("Disabling plugin due to missing Vault economy!");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
+        // Set up the SQLite database
         setUpDatabase();
 
         getLogger().info("BankPlugin has been enabled!");
 
+        // Register the /bank command
         getCommand("bank").setExecutor(new BankMenu(this));
     }
 
+    /**
+     * Called when the plugin is disabled. This method ensures that the database connection is closed.
+     */
     @Override
     public void onDisable() {
         try {
+            // Close the database connection if it's open
             if (connection != null && !connection.isClosed()) {
                 connection.close();
             }
@@ -42,10 +58,19 @@ public final class SimpleBanking extends JavaPlugin {
         getLogger().info("BankPlugin has been disabled!");
     }
 
+    /**
+     * Gets the active database connection.
+     *
+     * @return The current database connection, or {@code null} if not initialized.
+     */
     public Connection getDatabaseConnection() {
         return connection;
     }
 
+    /**
+     * Sets up the SQLite database by creating the necessary file and initializing the player_balances table
+     * if it doesn't exist.
+     */
     private void setUpDatabase() {
         try {
             // Create the data folder if it doesn't exist
@@ -53,11 +78,13 @@ public final class SimpleBanking extends JavaPlugin {
                 getDataFolder().mkdirs();
             }
 
-            // Use a file path inside the plugin's data folder
+            // Define the file path for the database in the plugin's data folder
             File databaseFile = new File(getDataFolder(), "banking.db");
+
+            // Establish a connection to the SQLite database
             connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
 
-            // Create the table if it doesn't exist
+            // Create the player_balances table if it doesn't exist
             try (PreparedStatement stmt = connection.prepareStatement(
                     "CREATE TABLE IF NOT EXISTS player_balances (" +
                             "uuid TEXT PRIMARY KEY, " +
