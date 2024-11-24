@@ -1,5 +1,6 @@
 package io.github.CodeerStudio.simpleBanking;
 
+import io.github.CodeerStudio.simpleBanking.commands.BankMenu;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.github.CodeerStudio.simpleBanking.handlers.VaultAPIHandler;
 
@@ -14,6 +15,8 @@ public final class SimpleBanking extends JavaPlugin {
         }
 
         getLogger().info("BankPlugin has been enabled!");
+
+        getCommand("bank").setExecutor(new BankMenu(this));
     }
 
     @Override

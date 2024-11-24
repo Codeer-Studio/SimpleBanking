@@ -2,3 +2,7 @@ name: SimpleBanking
 version: '1.0-SNAPSHOT'
 main: io.github.CodeerStudio.simpleBanking.SimpleBanking
 api-version: '1.21'
+commands:
+  bank:
+    description: Opens the bank menu
+    usage: /bank
