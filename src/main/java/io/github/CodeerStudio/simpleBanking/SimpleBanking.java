@@ -1,6 +1,10 @@
 package io.github.CodeerStudio.simpleBanking;
 
+import io.github.CodeerStudio.simpleBanking.commands.AdminGiveBalance;
+import io.github.CodeerStudio.simpleBanking.commands.AdminSetBalance;
+import io.github.CodeerStudio.simpleBanking.commands.AdminTakeBalance;
 import io.github.CodeerStudio.simpleBanking.commands.BankMenu;
+import io.github.CodeerStudio.simpleBanking.handlers.BankManagerHandler;
 import org.bukkit.plugin.java.JavaPlugin;
 import io.github.CodeerStudio.simpleBanking.handlers.VaultAPIHandler;
 
@@ -37,8 +41,14 @@ public final class SimpleBanking extends JavaPlugin {
 
         getLogger().info("BankPlugin has been enabled!");
 
-        // Register the /bank command
+        BankManagerHandler bankManagerHandler = new BankManagerHandler(this);
+
+
+        // Register the commands
         getCommand("bank").setExecutor(new BankMenu(this));
+        getCommand("setbankbalance").setExecutor(new AdminSetBalance(bankManagerHandler));
+        getCommand("givebankbalance").setExecutor(new AdminGiveBalance(bankManagerHandler));
+        getCommand("takebankbalance").setExecutor(new AdminTakeBalance(bankManagerHandler));
     }
 
     /**

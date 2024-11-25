@@ -6,3 +6,18 @@ commands:
   bank:
     description: Opens the bank menu
     usage: /bank
+
+  setbankbalance:
+    description: Set a player's bank balance.
+    usage: /setbankbalance <player> <amount>
+    permission: simplebanking.admin.set
+
+  givebankbalance:
+    description: Add money to a player's bank balance.
+    usage: /givebankbalance <player> <amount>
+    permission: simplebanking.admin.give
+
+  takebankbalance:
+    description: Take money from a player's bank balance.
+    usage: /takebankbalance <player> <amount>
+    permission: simplebanking.admin.take

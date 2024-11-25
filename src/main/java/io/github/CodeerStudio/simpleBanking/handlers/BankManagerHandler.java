@@ -115,6 +115,34 @@ public class BankManagerHandler {
     }
 
     /**
+     * Sets the player's bank balance to a specified amount.
+     *
+     * @param player The player whose balance is being set.
+     * @param amount The amount to set the player's balance to.
+     */
+    public void setBalance(Player player, double amount) {
+        if (amount < 0) {
+            player.sendMessage(ChatColor.RED + "Balance cannot be set to a negative value.");
+            return;
+        }
+
+        try (PreparedStatement stmt = plugin.getDatabaseConnection().prepareStatement(
+                "INSERT INTO player_balances (uuid, balance) VALUES (?, ?) " +
+                        "ON CONFLICT(uuid) DO UPDATE SET balance = ?")) {
+            stmt.setString(1, player.getUniqueId().toString());
+            stmt.setDouble(2, amount);
+            stmt.setDouble(3, amount);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            player.sendMessage(ChatColor.RED + "An error occurred while setting your balance.");
+            e.printStackTrace();
+            return;
+        }
+
+        player.sendMessage(ChatColor.GREEN + "Your bank balance has been set to " + amount + ".");
+    }
+
+    /**
      * Displays the player's bank balance by querying the database.
      *
      * @param player The player requesting their balance.
